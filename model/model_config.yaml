@@ -1,0 +1,3 @@
+use:
+  num_seq: 5
+  model_path: './checkpoint_model_best_acc.pth.tar'

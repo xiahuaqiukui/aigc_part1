@@ -6,10 +6,12 @@ import uuid
 from datetime import datetime
 import shutil
 import json
+import yaml
 
 from data_preparations.new_single_epoch_Sleep_EDF_153 import Sleep_EDF_SC_signal_extract, Sleep_EDF_SC_signal_extract_WITHOUT_HY
 from model.loader import SleepEDF_Seq_MultiChan_Dataset_Inference
 
+from model_run_util import model_run
 import torch
 from torchvision import transforms, datasets
 from torch.utils import data
@@ -34,67 +36,23 @@ async def upload(file: UploadFile = File(...)):
         raise HTTPException(status_code=413, detail="File too large")
     real_file.seek(0)
 
-    # 获得并对原始数据进行预处理
-    my_file = file.filename
-    eeg_raw_data, eeg_sub_len, eeg_mean, eeg_std = (
-        Sleep_EDF_SC_signal_extract_WITHOUT_HY(my_file, channel="eeg1", filter=True, freq=[0.2, 40])
-    )
-    eog_raw_data, _, eog_mean, eog_std = (
-        Sleep_EDF_SC_signal_extract_WITHOUT_HY(my_file, channel="eog", filter=True, freq=[0.2, 40])
-    )
-
-    # 封装数据
-    num_seq = 15
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    infer_dataset = SleepEDF_Seq_MultiChan_Dataset_Inference(eeg_file=eeg_raw_data,
-                                                             eog_file=eog_raw_data,
-                                                             # label_file=eeg_labels,
-                                                             device=device, mean_eeg_l=eeg_mean, sd_eeg_l=eeg_std,
-                                                             mean_eog_l=eog_mean, sd_eog_l=eog_std,
-                                                             sub_wise_norm=True, num_seq=num_seq,
-                                                             transform=transforms.Compose([
-                                                                 transforms.ToTensor()
-                                                             ]))
-
-    infer_data_loader = data.DataLoader(infer_dataset, batch_size=1, shuffle=False)  # 16
-    eeg_data, eog_data = next(iter(infer_data_loader))
-
-    # 第一张图片, eeg_sample
-    eeg_data_temp = eeg_data[0].squeeze()
-    eog_data_temp = eog_data[0].squeeze()
-
-    # print(eeg_data_temp.shape)
-
-    t = np.arange(0, 30, 1 / 100)
-    plt.figure(figsize=(10, 5))
-    plt.plot(eeg_data_temp[0].squeeze())
-    plt.plot(eog_data_temp[0].squeeze() + 5)
-    plt.title(f"EEG & EOG表格")
-
-    # ......
-    # 保存第一张图
-
-
-
     # 生成输出目录
     patient_id = str(uuid.uuid4())[:8]
     ts = datetime.utcnow().strftime("%Y-%m-%d-%H-%M-%S")
     out_dir = f"sleep_results/{patient_id}/{ts}"
     os.makedirs(out_dir, exist_ok=True)
 
-    # 保存上传文件（示例）
-    upload_path = os.path.join(out_dir, file.filename)
-    with open(upload_path, "wb") as f:
-        shutil.copyfileobj(real_file, f)
+    # 加载配置文件
+    with open("model/model_config.yaml") as f:
+    model_config = yaml.safe_load(f)
 
-    # TODO：后台处理，生成三张图
-    for name in ["eeg_sample.jpg", "relationships.jpg", "interpretation.jpg"]:
-        open(os.path.join(out_dir, name), "wb").close()
+    #调用模型函数model_run：包括数据预处理以及结果保存,返回睡眠阶段占比和睡眠结构
+    result_dict,pred_stages = model_run(real_file,out_dir,model_config)
 
     # 返回 JSON（英文键名 + 强制 UTF-8）
     data = {
-        "sleep_ratio": {"n1": 35, "n2": 25, "n3": 20, "w": 10, "rem": 10},
-        "sleep_stages": ["n1", "n2", "n3", "w", "rem", "n2", "n3"],
+        "sleep_ratio": result_dict,
+        "sleep_stages": pred_stages,
         "eeg_signal": [1.2, 3.4, 5.6, 7.8],
         "eog_signal": [0.1, 0.2, 0.3],
         "sampling_rate_hz": 100,
