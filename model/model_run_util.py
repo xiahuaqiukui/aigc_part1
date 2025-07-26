@@ -293,7 +293,7 @@ def model_run(Psg_file, out_dir, model_config, start_time=0):
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_seq = model_config["num_seq"]
+    num_seq = model_config["use"]["num_seq"]
 
     """生成数据加载器"""
     infer_dataset = SleepEDF_Seq_MultiChan_Dataset_Inference(eeg_file=eeg_raw_data,
@@ -332,7 +332,7 @@ def model_run(Psg_file, out_dir, model_config, start_time=0):
     plt.savefig(save_path, dpi=300)
 
     """ 部署模型"""
-    test_model = torch.load(model_config["model_path"], map_location=device, weights_only=False)
+    test_model = torch.load(model_config["use"]["model_path"], map_location=device, weights_only=False)
     test_model.eval()
     # print(sum(p.numel() for p in test_model.parameters() if p.requires_grad))
 
@@ -346,15 +346,16 @@ def model_run(Psg_file, out_dir, model_config, start_time=0):
     with torch.no_grad():  # 确保在接下来的代码块中不会计算梯度
         test_model.eval()  # 将模型设置为评估模式，这对于推断是必要的
         for batch_val_idx, data_val in enumerate(infer_data_loader):  # 遍历数据加载器中的每个批次
-            if batch_val_idx % 1 == 0: print("predicting", batch_val_idx)
+            # if batch_val_idx % 1 == 0:
+                # print("predicting", batch_val_idx)
             val_eeg, val_eog = data_val  # 从批次数据中解包EEG、EOG信号和标签
             pred, _ = test_model(val_eeg.float().to(device), val_eog.float().to(device))  # 使用模型进行预测，忽略返回的第二个值
 
-            print("#########")
-            print("Start")
-            print(pred)
-            print("End")
-            print("#########")
+            # print("#########")
+            # print("Start")
+            # print(pred)
+            # print("End")
+            # print("#########")
 
             # feat_main.append(feat_list)  # 这行代码被注释掉了，它看起来像是用来存储特征的
             for ep in range(num_seq):  # 遍历每个序列

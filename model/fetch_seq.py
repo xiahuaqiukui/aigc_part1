@@ -18,7 +18,7 @@ def fetch_seq(real_file,model_config):
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_seq = model_config["num_seq"]
+    num_seq = model_config["use"]["num_seq"]
     # num_seq = 5
 
     """生成数据加载器"""
