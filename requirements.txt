@@ -1,0 +1,11 @@
+numpy~=1.26.4
+matplotlib~=3.9.4
+mne~=1.8.0
+torch~=2.6.0+cu118
+torchvision~=0.21.0+cu118
+einops~=0.7.0
+pyedflib~=0.1.40
+pandas~=2.2.3
+scikit-learn~=1.4.2
+h5py~=3.11.0
+pyyaml~=6.0.2
