@@ -8,7 +8,7 @@ from model.sequence_cmt import (Seq_Cross_Transformer_Network, Epoch_Cross_Trans
                                 Window_Embedding, PositionalEncoding, Cross_modal_atten,Feed_forward)
 
 
-upload_path = r"E:\hkk\项目_可解释睡眠分期\项目原始数据集\physionet-sleep-data\SC4001E0-PSG.edf"
+upload_path = r"D:\项目原始数据集\SC4001E0-PSG.edf"
 
 patient_id = str(uuid.uuid4())[:8]
 ts = datetime.utcnow().strftime("%Y-%m-%d-%H-%M-%S")

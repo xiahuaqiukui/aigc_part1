@@ -252,7 +252,7 @@ def plot_interpret(i, x, y, dydx, fig, axs, axs_no, signal_type="EEG"):
     # plt.xlim(x.min(),x.max())
     # plt.colorbar()
 
-    # fig, axs = plt.subplots(2, 1, sharex=True, sharey=True,figsize = (30,10))
+    #fig, axs = plt.subplots(2, 1, sharex=True, sharey=True,figsize = (30,10), squeeze=False)
 
     # Create a continuous norm to map from data points to colors
     norm = plt.Normalize(dydx.min(), dydx.max())
@@ -593,7 +593,8 @@ def model_run(Psg_file, out_dir, model_config, start_time=0):
         axs[i][0].tick_params(axis='y', labelsize=label_font_size)
         axs[i][0].set_xlabel('Epochs', fontsize=title_font_size)
         yticks = axs[i][0].yaxis.get_major_ticks()
-        yticks[0].label1.set_visible(False)
+        if yticks:  # 检查是否存在刻度
+            yticks[0].label1.set_visible(False)
 
         # Plotting cross-modal attention ##############################
         rgba_colors = np.zeros((2, 4))
@@ -611,14 +612,14 @@ def model_run(Psg_file, out_dir, model_config, start_time=0):
         # # Plotting EEG attention ##############################
         eeg_atten_epoch = eeg_atten_list[i]
         t1 = np.arange(0, 3000, 1)
-        plot_interpret(t1, eeg_data[t, 0, i, :].squeeze().cpu().numpy(), eeg_atten, fig, [i, 2],
+        plot_interpret(i, t1, eeg_data[t, 0, i, :].squeeze().cpu().numpy(), eeg_atten, fig, axs, [i, 2],
                        signal_type=f"EEG Class:{pred_list[i]}")
 
         # plot_interpret(t1,eog_data[t,0,i,:].squeeze().cpu().numpy(),eog_atten,fig,[i,1],signal_type = "EOG")
 
         # # Plotting EOG attention ##############################
         eog_atten_epoch = eog_atten[i]
-        plot_interpret(t1, eog_data[t, 0, i, :].squeeze().cpu().numpy(), eog_atten, fig, [i, 3],
+        plot_interpret(i, t1, eog_data[t, 0, i, :].squeeze().cpu().numpy(), eog_atten, fig, axs, [i, 3],
                        signal_type=f"EOG Class:{pred_list[i]}")
 
     # time = [int(record_id.split('-')[1].split('_')[i]) for i in range(num_epoch_seq)]
