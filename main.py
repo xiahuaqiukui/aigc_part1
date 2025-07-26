@@ -101,3 +101,8 @@ def get_image(patient_id: str, date: str, filename: str):
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(path)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

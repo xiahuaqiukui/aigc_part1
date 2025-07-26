@@ -25,8 +25,8 @@ from matplotlib.collections import LineCollection
 
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
-from sequence_cmt import Epoch_Cross_Transformer
-from model_blocks import PositionalEncoding, Window_Embedding, Intra_modal_atten, Cross_modal_atten, Feed_forward
+from model.sequence_cmt import Epoch_Cross_Transformer
+from model.model_blocks import PositionalEncoding, Window_Embedding, Intra_modal_atten, Cross_modal_atten, Feed_forward
 
 
 

@@ -4,7 +4,7 @@ import os
 import uuid
 
 # 1. 本地文件路径
-FILE_PATH = r"E:\hkk\项目_可解释睡眠分期\项目原始数据集\physionet-sleep-data\SC4001E0-PSG.edf"
+FILE_PATH = r"E:\mne_data\physionet-sleep-data\SC4001E0-PSG.edf"
 if not os.path.exists(FILE_PATH):
     raise FileNotFoundError(FILE_PATH)
 
