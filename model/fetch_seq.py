@@ -38,7 +38,7 @@ def fetch_seq(real_file,model_config):
     eeg_data_temp = eeg_data[0].squeeze()  # (0)
     eog_data_temp = eog_data[0].squeeze()  # (0)
 
-    print(eeg_data_temp[0].squeeze())
-    print(eog_data_temp[0].squeeze())
+    # print(eeg_data_temp[0].squeeze())
+    # print(eog_data_temp[0].squeeze())
 
-    return eeg_data_temp[0].squeeze(), eog_data_temp[0].squeeze()
+    return eeg_data_temp[0].squeeze().tolist(), eog_data_temp[0].squeeze().tolist()
