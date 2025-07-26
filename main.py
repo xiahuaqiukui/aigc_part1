@@ -45,15 +45,20 @@ async def upload(file: UploadFile = File(...)):
     out_dir = f"sleep_results/{patient_id}/{ts}"
     os.makedirs(out_dir, exist_ok=True)
 
+    # 保存上传文件
+    upload_path = os.path.join(out_dir, file.filename)
+    with open(upload_path, "wb") as f:
+        shutil.copyfileobj(real_file, f)
+
     # 加载配置文件
     with open("model/model_config.yaml") as f:
         model_config = yaml.safe_load(f)
 
-    #调用模型函数model_run：包括数据预处理以及结果保存,返回睡眠阶段占比和睡眠结构
+    # 调用模型函数model_run：包括数据预处理以及结果保存,返回睡眠阶段占比和睡眠结构
     # 这里传入的参数file_path是文件的地址
-    file_path = file.file
-    result_dict,pred_stages = model_run(file_path,out_dir,model_config)
-    eeg_signal, eog_signal = fetch_seq(file_path,model_config)
+    result_dict, pred_stages = model_run(upload_path, out_dir, model_config)
+    eeg_signal, eog_signal = fetch_seq(upload_path, model_config)
+
 
     # 返回 JSON（英文键名 + 强制 UTF-8）
     data = {
