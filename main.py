@@ -11,13 +11,16 @@ import yaml
 from data_preparations.new_single_epoch_Sleep_EDF_153 import Sleep_EDF_SC_signal_extract, Sleep_EDF_SC_signal_extract_WITHOUT_HY
 from model.loader import SleepEDF_Seq_MultiChan_Dataset_Inference
 
-from model_run_util import model_run
+from model.model_run_util import model_run
+from model.fetch_seq import fetch_seq
 import torch
 from torchvision import transforms, datasets
 from torch.utils import data
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
+
+
 
 app = FastAPI()
 
@@ -44,17 +47,22 @@ async def upload(file: UploadFile = File(...)):
 
     # 加载配置文件
     with open("model/model_config.yaml") as f:
-    model_config = yaml.safe_load(f)
+        model_config = yaml.safe_load(f)
 
     #调用模型函数model_run：包括数据预处理以及结果保存,返回睡眠阶段占比和睡眠结构
-    result_dict,pred_stages = model_run(real_file,out_dir,model_config)
+    # 这里传入的参数file_path是文件的地址
+    file_path = file.file
+    result_dict,pred_stages = model_run(file_path,out_dir,model_config)
+    eeg_signal, eog_signal = fetch_seq(file_path,model_config)
 
     # 返回 JSON（英文键名 + 强制 UTF-8）
     data = {
         "sleep_ratio": result_dict,
         "sleep_stages": pred_stages,
-        "eeg_signal": [1.2, 3.4, 5.6, 7.8],
-        "eog_signal": [0.1, 0.2, 0.3],
+        # "eeg_signal": [1.2, 3.4, 5.6, 7.8],
+        # "eog_signal": [0.1, 0.2, 0.3],
+        "eeg_signal": eeg_signal,
+        "eog_signal": eog_signal,
         "sampling_rate_hz": 100,
         "eeg_preview_url": f"/sleep_results/{patient_id}/{ts}/eeg_sample.jpg",
         "relationship_img_url": f"/sleep_results/{patient_id}/{ts}/relationships.jpg",

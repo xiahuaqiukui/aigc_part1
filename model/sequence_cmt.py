@@ -18,7 +18,8 @@ from torch.nn import Linear
 from torch.nn import LayerNorm, BatchNorm1d
 from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange, Reduce
-from models.model_blocks import PositionalEncoding, Window_Embedding, Intra_modal_atten, Cross_modal_atten, Feed_forward
+from model.model_blocks import PositionalEncoding, Window_Embedding, Intra_modal_atten, Cross_modal_atten, Feed_forward
+
 from utils.metrics import accuracy, kappa, g_mean, plot_confusion_matrix, confusion_matrix, AverageMeter
 from utils.interpret import plot_interpret, softmax, scaled_dot_product_attention_mod
 

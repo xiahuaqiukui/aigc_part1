@@ -25,11 +25,13 @@ from matplotlib.collections import LineCollection
 
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
-from models.sequence_cmt import Seq_Cross_Transformer_Network  # as Seq_Cross_Transformer_Network
-from models.sequence_cmt import Epoch_Cross_Transformer
-from models.model_blocks import PositionalEncoding, Window_Embedding, Intra_modal_atten, Cross_modal_atten, Feed_forward
+from model.sequence_cmt import Seq_Cross_Transformer_Network  # as Seq_Cross_Transformer_Network
+from model.sequence_cmt import Epoch_Cross_Transformer
+from model.model_blocks import PositionalEncoding, Window_Embedding, Intra_modal_atten, Cross_modal_atten, Feed_forward
 
 import json
+
+from data_preparations.new_single_epoch_Sleep_EDF_153 import Sleep_EDF_SC_signal_extract_WITHOUT_HY
 
 class SleepEDF_Seq_MultiChan_Dataset_Inference(Dataset):
     def __init__(self, eeg_file, eog_file, device, mean_eeg_l=None, sd_eeg_l=None,
@@ -280,53 +282,14 @@ def atten_interpret(q, k):
     atten_weights = torch.softmax((q @ k.transpose(-2, -1) / math.sqrt(q.size(-1))), dim=-1)
     return atten_weights
 
-def new_signal_extract_2(path_1, channel='eeg1', filter=True, freq=[0.2, 40]):
-    all_channels = (
-    'EEG Fp1-LE', 'EEG F3-LE', 'EEG C3-LE', 'EEG P3-LE', 'EEG O1-LE', 'EEG F7-LE', 'EEG T3-LE',
-    'EEG T5-LE', 'EEG Fz-LE', 'EEG Fp2-LE', 'EEG F4-LE', 'EEG C4-LE', 'EEG P4-LE', 'EEG O2-LE',
-    'EEG F8-LE', 'EEG T4-LE', 'EEG T6-LE', 'EEG Cz-LE', 'EEG Pz-LE', 'EEG A2-A1', 'EEG 23A-23R',
-    'EEG 24A-24R')
 
-    data = [path_1]
-    signal2idx = {"eeg1": 8, "eeg2": 1, "eog": 18, "emg": 3}
-
-    all_channels_list = list(all_channels)
-    all_channels_list.remove(all_channels[signal2idx[channel]])
-    exclude_channels = tuple(all_channels_list)
-
-    sleep_signals = mne.io.read_raw_edf(data[0], verbose=True, exclude=exclude_channels, preload=True)
-
-    # Filtering
-    tmax = 30. - 1. / sleep_signals.info['sfreq']
-
-    if filter == True:
-        sleep_signals = sleep_signals.copy().filter(l_freq=freq[0], h_freq=freq[1])
-
-    duration = 30
-    epochs = mne.make_fixed_length_epochs(sleep_signals, duration=duration, preload=True)
-
-    # Calculate mean and std of the signal epochs
-    signal_mean = np.mean(epochs)
-    signal_std = np.std(epochs)
-
-    main_ext_raw_data = epochs.get_data()
-    main_sub_len = np.array([len(epochs)])
-    main_mean = np.tile(signal_mean, (len(epochs), 1)).squeeze()
-    main_std = np.tile(signal_std, (len(epochs), 1)).squeeze()
-
-    return main_ext_raw_data, main_sub_len, main_mean, main_std
-
-
-
-
-
-def model_run(Psg_file, out_dir,model_config,start_time = 0):
+def model_run(Psg_file, out_dir, model_config, start_time=0):
     """数据预处理"""
     eeg_raw_data, eeg_sub_len, eeg_mean, eeg_std = (
-        Sleep_EDF_SC_signal_extract_WITHOUT_HY(my_file, channel="eeg1", filter=True, freq=[0.2, 40])
+        Sleep_EDF_SC_signal_extract_WITHOUT_HY(Psg_file, channel="eeg1", filter=True, freq=[0.2, 40])
     )
     eog_raw_data, _, eog_mean, eog_std = (
-        Sleep_EDF_SC_signal_extract_WITHOUT_HY(my_file, channel="eog", filter=True, freq=[0.2, 40])
+        Sleep_EDF_SC_signal_extract_WITHOUT_HY(Psg_file, channel="eog", filter=True, freq=[0.2, 40])
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -344,8 +307,7 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
                                                              ]))
 
     infer_data_loader = data.DataLoader(infer_dataset, batch_size=1, shuffle=False)  # 16
-    eeg_data, eog_data= next(iter(infer_data_loader))
-
+    eeg_data, eog_data = next(iter(infer_data_loader))
 
     # print(f"EEG batch shape: {eeg_data.size()}")
     # print(f"EOG batch shape: {eog_data.size()}")
@@ -369,7 +331,6 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     save_path = os.path.join(out_dir, "eeg_sample.jpg")
     plt.savefig(save_path, dpi=300)
 
-
     """ 部署模型"""
     test_model = torch.load(model_config["model_path"], map_location=device, weights_only=False)
     test_model.eval()
@@ -377,7 +338,7 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
 
     """运行模型得到结果"""
     warnings.filterwarnings("ignore")
-    
+
     # feat_main = []
     pred_val_main = torch.zeros((len(infer_data_loader) + num_seq, 1, 5))  # data, output,seq pred,
     # labels_val_main = torch.zeros((len(infer_data_loader) + num_seq, 1))  # data, output,seq pred,
@@ -388,13 +349,12 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
             if batch_val_idx % 1 == 0: print("predicting", batch_val_idx)
             val_eeg, val_eog = data_val  # 从批次数据中解包EEG、EOG信号和标签
             pred, _ = test_model(val_eeg.float().to(device), val_eog.float().to(device))  # 使用模型进行预测，忽略返回的第二个值
-            
+
             print("#########")
             print("Start")
             print(pred)
             print("End")
             print("#########")
-            
 
             # feat_main.append(feat_list)  # 这行代码被注释掉了，它看起来像是用来存储特征的
             for ep in range(num_seq):  # 遍历每个序列
@@ -411,11 +371,11 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     total_steps = pred_labels.size(0)
     # 4. 创建睡眠阶段名称映射
     stage_mapping = {
-        0: "w",     # Wake
-        1: "n1",    # NREM Stage 1
-        2: "n2",    # NREM Stage 2
-        3: "n3",    # NREM Stage 3
-        4: "rem"    # REM Sleep
+        0: "w",  # Wake
+        1: "n1",  # NREM Stage 1
+        2: "n2",  # NREM Stage 2
+        3: "n3",  # NREM Stage 3
+        4: "rem"  # REM Sleep
     }
     # 5. 计算各阶段占比百分比（四舍五入到整数）
     result_dict = {}
@@ -432,7 +392,6 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     """获取预测pred"""
     # 将索引映射为阶段名称
     pred_stages = [stage_mapping[idx.item()] for idx in pred_labels]
-
 
     """这上面要生成一个预测结果的文件，供提取睡眠分期结构使用(?存疑，不知道提取睡眠结构特征的函数要的是怎么样的文件)"""
 
@@ -452,7 +411,8 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     #     for j in range(num_seq):
     #         new_pred.append(pred[j])
 
-    pred, feat_list = test_model(eeg_data[t].unsqueeze(0).float().to(device), eog_data[t].unsqueeze(0).float().to(device))
+    pred, feat_list = test_model(eeg_data[t].unsqueeze(0).float().to(device),
+                                 eog_data[t].unsqueeze(0).float().to(device))
     pred = np.array([i.argmax(-1).item() for i in pred])
 
     label_dict = ['Wake', 'N1', 'N2', 'N3', 'REM']
@@ -490,7 +450,7 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     # with open(file_path, 'w') as file:  # 打开文件用于写入
     #     json.dump(data_new, file)  # 将data_new转换为JSON格式并写入文件
 
-#########################################################################################################################################
+    #########################################################################################################################################
     # ## 画图 ##
     # ###### Interpreting inter-epoch relationships  ##########
     # plt.rcParams['axes.linewidth'] = 2
@@ -505,15 +465,15 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     for i in range(num_seq):
         seq_atten = atten_interpret(seq_features.squeeze()[i].unsqueeze(0),
                                     seq_features.squeeze()).squeeze().detach().cpu().numpy()
-    #
-    #     rgba_colors = np.zeros((num_seq, 4))
-    #     rgba_colors[:, 0] = 0  # value of red intensity divided by 256
-    #     rgba_colors[i, 0] = 0.4  # value of red intensity divided by 256
-    #     rgba_colors[:, 1] = 0  # value of green intensity divided by 256
-    #     rgba_colors[:, 2] = 0.4  # value of blue intensity divided by 256
-    #     rgba_colors[i, 2] = 0
+        #
+        #     rgba_colors = np.zeros((num_seq, 4))
+        #     rgba_colors[:, 0] = 0  # value of red intensity divided by 256
+        #     rgba_colors[i, 0] = 0.4  # value of red intensity divided by 256
+        #     rgba_colors[:, 1] = 0  # value of green intensity divided by 256
+        #     rgba_colors[:, 2] = 0.4  # value of blue intensity divided by 256
+        #     rgba_colors[i, 2] = 0
         seq_atten = seq_atten / seq_atten.max()
-    #
+        #
         seq_atten_list.append(seq_atten)  #
     #     rgba_colors[:, -1] = seq_atten
     #     ###############################################################################
@@ -536,8 +496,10 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     # plt.savefig(save_path, dpi=300)
     #
     """第二张图：模态间关系图"""
-     fig, axs = plt.subplots(15, 1, figsize=(1 * 5, 15 * 10))
-     fig, axs = plt.subplots(5, 1, figsize=(1 * 5, 15 * 10))
+    fig, axs = plt.subplots(15, 1, figsize=(1 * 5, 15 * 10))
+    fig, axs = plt.subplots(5, 1, figsize=(1 * 5, 15 * 10))
+
+
     cross_atten_list = []  #
     # from matplotlib.font_manager import FontProperties
     # my_font = FontProperties(fname='env/simhei.ttf')
@@ -547,23 +509,24 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
         cross_atten = atten_interpret(cross_features.squeeze()[0].unsqueeze(0),
                                       cross_features.squeeze()[1:]).squeeze().detach().cpu().numpy()
         cross_atten_list.append(cross_atten)  #
-    
-         rgba_colors = np.zeros((2, 4))
-         rgba_colors[:, 0] = 0.4  # value of red intensity divided by 256
-         rgba_colors[:, 1] = 0  # value of green intensity divided by 256
-         rgba_colors[:, 2] = 0  # value of blue intensity divided by 256
-         rgba_colors[:, -1] = cross_atten + 0.1
-         axs[i].bar(['EEG', 'EOG'], cross_atten,  # color ='red',
-                    color=rgba_colors, align='center', width=0.9)
-         axs[i].tick_params(axis='x', labelsize=30)  # ,which = 'both')
-         axs[i].tick_params(axis='y', labelsize=30)
-         axs[i].set_ylim(0, 1.02)
-         axs[i].set_xlabel('注意力占比', fontsize=30, fontproperties=my_font)
 
-     if not os.path.exists(out_dir):
-         os.makedirs(out_dir)
-     save_path = os.path.join(out_dir, "relationships.jpg")
-     plt.savefig(save_path, dpi=300)
+        rgba_colors = np.zeros((2, 4))
+        rgba_colors[:, 0] = 0.4  # value of red intensity divided by 256
+        rgba_colors[:, 1] = 0  # value of green intensity divided by 256
+        rgba_colors[:, 2] = 0  # value of blue intensity divided by 256
+        rgba_colors[:, -1] = cross_atten + 0.1
+        axs[i].bar(['EEG', 'EOG'], cross_atten,  # color ='red',
+                   color=rgba_colors, align='center', width=0.9)
+        axs[i].tick_params(axis='x', labelsize=30)  # ,which = 'both')
+        axs[i].tick_params(axis='y', labelsize=30)
+        axs[i].set_ylim(0, 1.02)
+        # axs[i].set_xlabel('注意力占比', fontsize=30, fontproperties=my_font)
+        axs[i].set_xlabel('注意力占比', fontsize=30)
+
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    save_path = os.path.join(out_dir, "relationships.jpg")
+    plt.savefig(save_path, dpi=300)
     # # plt.savefig(f'/content/cross_modal_sub_{subject_no}_day_{days}_t_{t}_part_1.pdf',dpi = 300)
     #
     # ###### Interpreting intra-modal relationships  ##########
@@ -581,17 +544,17 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
         eeg_features = feat_list[i][0]  ##extracting learned intra-modal EEG features
         eog_features = feat_list[i][1]  ##extracting learned intra-modal EOG features
         cross_features = feat_list[i][-1]  ##extracting learned cross-modal features
-    #
+        #
         eeg_atten = atten_interpret(cross_features.squeeze()[0].unsqueeze(0),
                                     eeg_features.squeeze()[1:])  # .squeeze().detach().cpu().numpy()
         eog_atten = atten_interpret(cross_features.squeeze()[0].unsqueeze(0),
                                     eog_features.squeeze()[1:])  # .squeeze().detach().cpu().numpy()
-    #
+        #
         eeg_atten = F.upsample(eeg_atten.unsqueeze(0), scale_factor=3000 // 60,
                                mode='nearest').squeeze().detach().cpu().numpy()
         eog_atten = F.upsample(eog_atten.unsqueeze(0), scale_factor=3000 // 60,
                                mode='nearest').squeeze().detach().cpu().numpy()
-    #
+        #
         eeg_atten_list.append(eeg_atten)  #
         eog_atten_list.append(eog_atten)  #
     #
@@ -604,7 +567,7 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     #     os.makedirs(save_dir)
     # save_path = os.path.join(save_dir, "picture_4.jpg")
     # plt.savefig(save_path, dpi=200)
-#########################################################################################################################################
+    #########################################################################################################################################
 
 
     """# Final plot similar to the paper"""
@@ -667,6 +630,6 @@ def model_run(Psg_file, out_dir,model_config,start_time = 0):
     save_path = os.path.join(out_dir, "interpretation.jpg")
     plt.savefig(save_path, dpi=150)
 
-    return result_dict,pred_stages
+    return result_dict, pred_stages
 #if __name__ == '__main__':
  #   main()
